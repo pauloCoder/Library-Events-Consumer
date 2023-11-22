@@ -14,7 +14,7 @@ spring:
     topic: library-events
     consumer:
       bootstrap-servers: localhost:9092, localhost:9093, localhost:9094
-      group-id: library-console-consumer
+      group-id: library-consumer-group-01
       key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
