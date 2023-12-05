@@ -13,7 +13,6 @@ import lombok.*;
 @Entity
 public class Book {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer bookId;
     @NotBlank
     private String bookName;

@@ -15,7 +15,7 @@ import lombok.*;
 public class LibraryEvent {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private Integer libraryEventId;
     @Enumerated(EnumType.STRING)
     LibraryEventType libraryEventType;
