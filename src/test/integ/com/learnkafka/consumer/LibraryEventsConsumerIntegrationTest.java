@@ -169,11 +169,11 @@ class LibraryEventsConsumerIntegrationTest {
         kafkaTemplate.send("library-events-test", json)
                 .get();
         CountDownLatch latch = new CountDownLatch(1);
-        latch.await(10, TimeUnit.SECONDS);
+        latch.await(5, TimeUnit.SECONDS);
 
         // ASSERT
-        Mockito.verify(libraryEventsConsumerSpy, Mockito.times(10)).onMessage(Mockito.any(ConsumerRecord.class));
-        Mockito.verify(libraryEventsServiceSpy, Mockito.times(10)).processLibraryEvent(Mockito.any(ConsumerRecord.class));
+        Mockito.verify(libraryEventsConsumerSpy, Mockito.times(5)).onMessage(Mockito.any(ConsumerRecord.class));
+        Mockito.verify(libraryEventsServiceSpy, Mockito.times(5)).processLibraryEvent(Mockito.any(ConsumerRecord.class));
 
 
     }

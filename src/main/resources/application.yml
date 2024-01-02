@@ -17,6 +17,8 @@ spring:
       group-id: library-consumer-group-01
       key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      back-off-interval: 1000
+      back-off-max-attempts: 5
     producer:
       bootstrap-servers: localhost:9092, localhost:9093, localhost:9094
       key-serializer: org.apache.kafka.common.serialization.IntegerSerializer
