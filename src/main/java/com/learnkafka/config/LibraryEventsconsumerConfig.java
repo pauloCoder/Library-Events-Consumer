@@ -6,11 +6,13 @@ import org.springframework.boot.autoconfigure.kafka.ConcurrentKafkaListenerConta
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.RecoverableDataAccessException;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
+import java.util.List;
 
 @Slf4j
 @Setter
@@ -23,13 +25,21 @@ public class LibraryEventsconsumerConfig {
     private Long backOffMaxAttempts;
 
     @Bean
-    ConcurrentKafkaListenerContainerFactory<?, ?> kafkaListenerContainerFactory(
+    ConcurrentKafkaListenerContainerFactory<Object, Object> kafkaListenerContainerFactory(
             ConcurrentKafkaListenerContainerFactoryConfigurer configurer,
             ConsumerFactory<Object, Object> kafkaConsumerFactory) {
         ConcurrentKafkaListenerContainerFactory<Object, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        var exceptionsToIgnoreList = List.of(
+                IllegalArgumentException.class
+        );
+        var exceptionsToRetryList = List.of(
+                RecoverableDataAccessException.class
+        );
         DefaultErrorHandler defaultErrorHandler = new DefaultErrorHandler(
                 new FixedBackOff(backOffInterval, backOffMaxAttempts - 1)
         );
+        exceptionsToIgnoreList.forEach(defaultErrorHandler::addNotRetryableExceptions);
+        exceptionsToRetryList.forEach(defaultErrorHandler::addRetryableExceptions);
         defaultErrorHandler.setRetryListeners(
                 (failedRecord, ex, deliveryAttempt) -> log.error("Failed record in Retry Listener, Exception : {}, deliveryAttempt : {}", ex.getMessage(), deliveryAttempt)
         );
