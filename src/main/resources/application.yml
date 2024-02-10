@@ -4,8 +4,12 @@ spring:
 server:
   port: 8081
 topics:
-  retry: library-events.RETRY
-  dlt: library-events.DLT
+  retry:
+    listener: library-events.RETRY
+    startup: true
+  dlt:
+    listener: library-events.DLT
+    startup: true
 
 ---
 

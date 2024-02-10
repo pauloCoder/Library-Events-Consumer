@@ -1,7 +1,6 @@
 package com.learnkafka.consumer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.learnkafka.service.LibraryEventsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -11,14 +10,11 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class LibraryEventsRetryConsumer {
+public class LibraryEventsDeadLetterTopicConsumer {
 
-    private final LibraryEventsService libraryEventsService;
-
-    @KafkaListener(topics = "${topics.retry.listener}", autoStartup = "${topics.retry.startup: true}", groupId = "retry-listener-group")
+    @KafkaListener(topics = "${topics.dlt.listener}", autoStartup = "${topics.dlt.startup: true}", groupId = "dlt-listener-group")
     public void onMessage(ConsumerRecord<Integer, String> consumerRecord) throws JsonProcessingException {
-        log.info("ConsumerRecord in Retry Consumer : {}", consumerRecord);
-         libraryEventsService.processLibraryEvent(consumerRecord);
+        log.error("ConsumerRecord in DeadLetterTopic Consumer : {}", consumerRecord);
     }
 
 }

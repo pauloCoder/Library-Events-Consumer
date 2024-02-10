@@ -16,7 +16,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.List;
 
@@ -33,23 +33,22 @@ public class LibraryEventsconsumerConfig {
     @Autowired
     private KafkaTemplate<Integer, String> kafkaTemplate;
 
-    @Value("${topics.retry}")
+    @Value("${topics.retry.listener}")
     private String retryTopic;
 
-    @Value("${topics.dlt}")
+    @Value("${topics.dlt.listener}")
     private String deadLetterTopic;
 
     public DeadLetterPublishingRecoverer deadLetterPublishingRecoverer() {
-        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaTemplate,
-                (record, exception) -> {
+        return new DeadLetterPublishingRecoverer(kafkaTemplate,
+                (consumerRecord, exception) -> {
+                    log.error("Exception in publishingRecoverer :{}", exception.getMessage(), exception);
                     if (exception.getCause() instanceof RecoverableDataAccessException) {
-                        return new TopicPartition(retryTopic, record.partition());
-                    }
-                    else {
-                        return new TopicPartition(deadLetterTopic, record.partition());
+                        return new TopicPartition(retryTopic, consumerRecord.partition());
+                    } else {
+                        return new TopicPartition(deadLetterTopic, consumerRecord.partition());
                     }
                 });
-        return recoverer;
     }
 
     @Bean
@@ -63,14 +62,14 @@ public class LibraryEventsconsumerConfig {
         var exceptionsToRetryList = List.of(
                 RecoverableDataAccessException.class
         );
-        // var fixedBackOff = new FixedBackOff(backOffInterval, backOffMaxAttempts - 1);
-        var exponentialBackOffWithMaxRetries = new ExponentialBackOffWithMaxRetries(backOffMaxAttempts.intValue() - 1);
-        exponentialBackOffWithMaxRetries.setInitialInterval(1000L);
-        exponentialBackOffWithMaxRetries.setMultiplier(2.0);
-        exponentialBackOffWithMaxRetries.setMaxInterval(2000L);
+        var fixedBackOff = new FixedBackOff(backOffInterval, backOffMaxAttempts - 1);
+//        var exponentialBackOffWithMaxRetries = new ExponentialBackOffWithMaxRetries(backOffMaxAttempts.intValue() - 1);
+//        exponentialBackOffWithMaxRetries.setInitialInterval(1000L);
+//        exponentialBackOffWithMaxRetries.setMultiplier(2.0);
+//        exponentialBackOffWithMaxRetries.setMaxInterval(2000L);
         DefaultErrorHandler defaultErrorHandler = new DefaultErrorHandler(
                 deadLetterPublishingRecoverer(),
-                exponentialBackOffWithMaxRetries
+                fixedBackOff
         );
         exceptionsToIgnoreList.forEach(defaultErrorHandler::addNotRetryableExceptions);
         exceptionsToRetryList.forEach(defaultErrorHandler::addRetryableExceptions);

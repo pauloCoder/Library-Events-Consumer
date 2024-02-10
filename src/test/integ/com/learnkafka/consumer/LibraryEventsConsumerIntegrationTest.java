@@ -14,7 +14,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -43,7 +42,8 @@ import java.util.concurrent.TimeUnit;
         "spring.kafka.topic=library-events-test",
         "spring.kafka.producer.bootstrap-servers=${spring.embedded.kafka.brokers}",
         "spring.kafka.consumer.bootstrap-servers=${spring.embedded.kafka.brokers}",
-        "retry.listener.startup= false"
+        "topics.retry.startup= false",
+        "topics.dlt.startup= false"
 })
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_EACH_TEST_METHOD)
@@ -71,10 +71,10 @@ class LibraryEventsConsumerIntegrationTest {
 
     private Consumer<Integer, String> kafkaRecoveryConsumer;
 
-    @Value("${topics.retry}")
+    @Value("${topics.retry.listener}")
     private String retryTopic;
 
-    @Value("${topics.dlt}")
+    @Value("${topics.dlt.listener}")
     private String deadLetterTopic;
 
     @BeforeEach
@@ -84,17 +84,6 @@ class LibraryEventsConsumerIntegrationTest {
                 .filter(messageListenerContainer -> Objects.equals(messageListenerContainer.getGroupId(), "library-events-listener-group"))
                 .findFirst()
                 .ifPresent(messageListenerContainer -> ContainerTestUtils.waitForAssignment(messageListenerContainer, embeddedKafkaBroker.getPartitionsPerTopic()));
-
-        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("console-consumer-1901", "true", embeddedKafkaBroker);
-        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        // Configuration du consumer pour les topics de recovery
-        kafkaRecoveryConsumer = new DefaultKafkaConsumerFactory<>(consumerProps, new IntegerDeserializer(), new StringDeserializer())
-                .createConsumer();
-    }
-
-    @AfterEach
-    public void tearDown() {
-        kafkaRecoveryConsumer.close();
     }
 
     @Test
@@ -197,6 +186,11 @@ class LibraryEventsConsumerIntegrationTest {
                     }
                 }
                 """;
+        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("console-consumer-1901", "true", embeddedKafkaBroker);
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        // Configuration du consumer pour les topics de recovery
+        kafkaRecoveryConsumer = new DefaultKafkaConsumerFactory<>(consumerProps, new IntegerDeserializer(), new StringDeserializer())
+                .createConsumer();
 
         // ACT
         kafkaTemplate.send("library-events-test", json)
@@ -207,6 +201,15 @@ class LibraryEventsConsumerIntegrationTest {
         // ASSERT
         Mockito.verify(libraryEventsConsumerSpy, Mockito.times(1)).onMessage(Mockito.any(ConsumerRecord.class));
         Mockito.verify(libraryEventsServiceSpy, Mockito.times(1)).processLibraryEvent(Mockito.any(ConsumerRecord.class));
+
+        embeddedKafkaBroker.consumeFromAnEmbeddedTopic(kafkaRecoveryConsumer, deadLetterTopic);
+        ConsumerRecord<Integer, String> consumerRecord = KafkaTestUtils.getSingleRecord(kafkaRecoveryConsumer, deadLetterTopic);
+        Assertions.assertThat(consumerRecord)
+                .isNotNull()
+                .satisfies(record -> {
+                    Assertions.assertThat(record.topic()).isEqualTo(deadLetterTopic);
+                    Assertions.assertThat(json).isEqualTo(record.value());
+                });
 
     }
 
@@ -225,6 +228,11 @@ class LibraryEventsConsumerIntegrationTest {
                     }
                 }
                 """;
+        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("console-consumer-1902", "true", embeddedKafkaBroker);
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        // Configuration du consumer pour les topics de recovery
+        kafkaRecoveryConsumer = new DefaultKafkaConsumerFactory<>(consumerProps, new IntegerDeserializer(), new StringDeserializer())
+                .createConsumer();
 
         // ACT
         kafkaTemplate.send("library-events-test", json)
