@@ -1,5 +1,5 @@
 package com.learnkafka.enums;
 
 public enum FailureRecordStatus {
-    RETRY, DLT
+    RETRY, DLT, SUCCESS
 }

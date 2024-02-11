@@ -27,4 +27,14 @@ public class FailureRecordService {
                 .build();
         failureRecordRepository.save(failureRecord);
     }
+
+    public static ConsumerRecord<Integer, String> failureRecordToConsumerRecord(FailureRecord failureRecord) {
+        return new ConsumerRecord<>(
+                failureRecord.getTopic(),
+                failureRecord.getPartition(),
+                failureRecord.getOffsetValue(),
+                failureRecord.getCle(),
+                failureRecord.getErrorRecord()
+        );
+    }
 }
