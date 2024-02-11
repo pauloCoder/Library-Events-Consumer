@@ -1,7 +1,10 @@
 package com.learnkafka.config;
 
+import com.learnkafka.enums.FailureRecordStatus;
+import com.learnkafka.service.FailureRecordService;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +17,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
@@ -33,6 +37,9 @@ public class LibraryEventsconsumerConfig {
     @Autowired
     private KafkaTemplate<Integer, String> kafkaTemplate;
 
+    @Autowired
+    private FailureRecordService failureRecordService;
+
     @Value("${topics.retry.listener}")
     private String retryTopic;
 
@@ -51,6 +58,20 @@ public class LibraryEventsconsumerConfig {
                 });
     }
 
+    ConsumerRecordRecoverer consumerRecordRecoverer = (consumerRec, exception) -> {
+        log.error("Exception in consumerRecordRecoverer :{}", exception.getMessage(), exception);
+        ConsumerRecord<Integer, String> consumerRecord = (ConsumerRecord<Integer, String>) consumerRec;
+        if (exception.getCause() instanceof RecoverableDataAccessException) {
+            // recovery logic
+            log.info("Inside Recovery");
+            failureRecordService.saveFailedRecord(consumerRecord, exception, FailureRecordStatus.RETRY);
+        } else {
+            // no recovery logic
+            log.info("Inside Non-Recovery");
+            failureRecordService.saveFailedRecord(consumerRecord, exception, FailureRecordStatus.DLT);
+        }
+    };
+
     @Bean
     ConcurrentKafkaListenerContainerFactory<Object, Object> kafkaListenerContainerFactory(
             ConcurrentKafkaListenerContainerFactoryConfigurer configurer,
@@ -68,7 +89,7 @@ public class LibraryEventsconsumerConfig {
 //        exponentialBackOffWithMaxRetries.setMultiplier(2.0);
 //        exponentialBackOffWithMaxRetries.setMaxInterval(2000L);
         DefaultErrorHandler defaultErrorHandler = new DefaultErrorHandler(
-                deadLetterPublishingRecoverer(),
+                consumerRecordRecoverer,
                 fixedBackOff
         );
         exceptionsToIgnoreList.forEach(defaultErrorHandler::addNotRetryableExceptions);

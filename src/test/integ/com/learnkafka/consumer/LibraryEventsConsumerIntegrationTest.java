@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.learnkafka.entity.Book;
 import com.learnkafka.entity.LibraryEvent;
 import com.learnkafka.entity.LibraryEventType;
+import com.learnkafka.jpa.FailureRecordRepository;
 import com.learnkafka.jpa.LibraryEventsRepository;
 import com.learnkafka.service.LibraryEventsService;
 import jakarta.annotation.Resource;
@@ -68,6 +69,9 @@ class LibraryEventsConsumerIntegrationTest {
 
     @Autowired
     private LibraryEventsRepository libraryEventsRepository;
+
+    @Autowired
+    private FailureRecordRepository failureRecordRepository;
 
     private Consumer<Integer, String> kafkaRecoveryConsumer;
 
@@ -214,6 +218,45 @@ class LibraryEventsConsumerIntegrationTest {
     }
 
     @Test
+    void testPublishUpdateLibraryEventWithNullLibraryEventIdFailureRecord() throws JsonProcessingException, ExecutionException, InterruptedException {
+
+        // ARRANGE
+        String json = """
+                {
+                    "libraryEventId": null,
+                    "libraryEventType": "UPDATE",
+                    "book": {
+                        "bookId": 456,
+                        "bookName": "Kafka Using Spring Boot",
+                        "bookAuthor": "Dilip"
+                    }
+                }
+                """;
+        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("console-consumer-1901", "true", embeddedKafkaBroker);
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        // Configuration du consumer pour les topics de recovery
+        kafkaRecoveryConsumer = new DefaultKafkaConsumerFactory<>(consumerProps, new IntegerDeserializer(), new StringDeserializer())
+                .createConsumer();
+
+        // ACT
+        kafkaTemplate.send("library-events-test", json)
+                .get();
+        CountDownLatch latch = new CountDownLatch(1);
+        latch.await(5, TimeUnit.SECONDS);
+
+        // ASSERT
+        Mockito.verify(libraryEventsConsumerSpy, Mockito.times(1)).onMessage(Mockito.any(ConsumerRecord.class));
+        Mockito.verify(libraryEventsServiceSpy, Mockito.times(1)).processLibraryEvent(Mockito.any(ConsumerRecord.class));
+
+        long  countDatas = failureRecordRepository.count();
+        Assertions.assertThat(countDatas).isEqualTo(1);
+        failureRecordRepository.findAll()
+                .forEach(failureRecord -> {
+                    System.out.println("failureRecord : " + failureRecord);
+                });
+    }
+
+    @Test
     void testPublishUpdateLibraryEventWithLibraryEventIdNotNullAndExceptionRetry() throws JsonProcessingException, ExecutionException, InterruptedException {
 
         // ARRANGE
@@ -238,7 +281,7 @@ class LibraryEventsConsumerIntegrationTest {
         kafkaTemplate.send("library-events-test", json)
                 .get();
         CountDownLatch latch = new CountDownLatch(1);
-        latch.await(10, TimeUnit.SECONDS);
+        latch.await(5, TimeUnit.SECONDS);
 
         // ASSERT
         Mockito.verify(libraryEventsConsumerSpy, Mockito.times(5)).onMessage(Mockito.any(ConsumerRecord.class));
