@@ -1,0 +1,30 @@
+#Environment Variables in Run Configurations=spring.profiles.active=ssl
+spring:
+  config:
+    activate:
+      on-profile: ssl
+  kafka:
+    topic:  library-events
+    template:
+      default-topic: library-events
+    consumer:
+      bootstrap-servers: localhost:9092
+      key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      back-off-interval: 1000
+      back-off-max-attempts: 5
+      ssl:
+        trust-store-location: file:F:/Formations/Apache Kafka with Spring Boot/kafka-cluster-ssl-main/secrets/kafka.producer.truststore.jks
+        trust-store-password: confluent
+        key-store-location: file:/F:/Formations/Apache Kafka with Spring Boot/kafka-cluster-ssl-main/secrets/kafka.producer.keystore.jks
+        key-store-password: confluent
+      properties:
+        acks: all
+        retries: 10
+        retry.backoff.ms: 1000
+        security:
+          protocol: SSL
+        ssl.endpoint.identification.algorithm:
+    admin:
+      properties:
+        bootstrap.servers: localhost:9092
